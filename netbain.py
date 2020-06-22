@@ -1,25 +1,27 @@
-import requests
-from lxml import etree
+from requests_html import HTMLSession
 import os
 import time
 
 # 网站URL
 baseUrl = 'http://pic.netbian.com/'
+headers = {
+        'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0'
+    }
 
 # 分栏链接
 columnUrls = [
-    ['风景', 'http://pic.netbian.com/4kfengjing'],
-    ['美女', 'http://pic.netbian.com/4kmeinv'],
-    ['游戏', 'http://pic.netbian.com/4kyouxi'],
-    ['动漫', 'http://pic.netbian.com/4kdongman'],
-    ['影视', 'http://pic.netbian.com/4kyingshi'],
-    ['明星', 'http://pic.netbian.com/4kmingxing'],
-    ['汽车', 'http://pic.netbian.com/4kqiche'],
-    ['动物', 'http://pic.netbian.com/4kdongwu'],
-    ['人物', 'http://pic.netbian.com/4krenwu'],
-    ['美食', 'http://pic.netbian.com/4kmeishi'],
-    ['宗教', 'http://pic.netbian.com/4kzongjiao'],
-    ['背景', 'http://pic.netbian.com/4kbeijing']
+    ['风景', baseUrl+'4kfengjing'],
+    ['美女', baseUrl+'4kmeinv'],
+    ['游戏', baseUrl+'4kyouxi'],
+    ['动漫', baseUrl+'4kdongman'],
+    ['影视', baseUrl+'4kyingshi'],
+    ['明星', baseUrl+'4kmingxing'],
+    ['汽车', baseUrl+'4kqiche'],
+    ['动物', baseUrl+'4kdongwu'],
+    ['人物', baseUrl+'4krenwu'],
+    ['美食', baseUrl+'4kmeishi'],
+    ['宗教', baseUrl+'4kzongjiao'],
+    ['背景', baseUrl+'4kbeijing']
 ]
 
 # 选择的栏目编号
@@ -106,18 +108,15 @@ def mkDir(path: str):
 
 
 def getNextUrlS(url):
-    # 解析html
-    r = requests.get(url)
-    if r.status_code:
-        r.encoding = r.apparent_encoding
+    nextUrls = []
 
-    # 提取链接
-    html = etree.HTML(r.text)
-    nextUrls = html.xpath('/html/body/div[2]/div/div[3]/ul/li/a/@href')
+    # 解析网页并提取所有a节点
+    r = HTMLSession().get(url,headers=headers).html.find('.slist a')
 
-    # 完整链接
-    for i in range(len(nextUrls)):
-        nextUrls[i] = baseUrl+nextUrls[i][1:]
+    # 获取完整链接
+    for i in r:
+        nextUrls.append(baseUrl+''.join(i.links)[1:])
+        print(baseUrl+''.join(i.links)[1:])
 
     return nextUrls
 
@@ -126,14 +125,9 @@ def getImgUrls(urls):
     imgs = []
 
     for url in urls:
-        r = requests.get(url)
-        if r.raise_for_status:
-            r.encoding = r.apparent_encoding
-
-            html = etree.HTML(r.text)
-            imgUrl = html.xpath(
-                '/html/body/div[2]/div[1]/div[2]/div[1]/div[2]/a/img/@src')
-        imgs.append(baseUrl+imgUrl[0][1:])
+        r = HTMLSession().get(url,headers=headers).html.find('#img img')[0].attrs['src']
+        imgs.append(baseUrl+r[1:])
+        print(baseUrl+r[1:])
 
     return imgs
 
@@ -143,8 +137,9 @@ def downImg(url, savePath, interval):
 
     try:
         for i in range(len(url)):
-            r = requests.get(url[i])
+            r = HTMLSession().get(url[i],headers=headers)
             path = savePath+str(i+1)+'.jpg'
+
             if not os.path.exists(path):
                 with open(path, 'wb') as f:
                     f.write(r.content)
@@ -152,7 +147,8 @@ def downImg(url, savePath, interval):
                 count += 1
             else:
                 print(path+' 已存在！')
-                time.sleep(interval)
+
+            time.sleep(interval)
     except:
         print('保存失败!')
         exit(0)
@@ -177,7 +173,7 @@ def main():
     # 取链
     pageUrl = ''
     pageDir = ''
-    interval = 0.1  # 爬取间隔
+    interval = 100  # 爬取间隔
     imgCount = 0
     for page in range(startPage, startPage+countPage):
         # 页地址
